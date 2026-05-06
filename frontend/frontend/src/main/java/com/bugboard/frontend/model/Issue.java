@@ -1,0 +1,93 @@
+package com.bugboard.frontend.model;
+
+public class Issue {
+    private String id;
+    private String title;
+    private String description;
+    private String status;
+    private String type;
+    private String priority;
+    private String assignee;
+
+    private byte[] imageData;
+    private String imageName;
+
+    public Issue(){}
+    public Issue(String id, String title, String description, String status, String type, String priority, String assignee, byte[] imageData, String imageName) {
+        this.id = id;
+        this.title = title;
+        this.description = description;
+        this.status = status;
+        this.type = type;
+        this.priority = priority;
+        this.assignee = assignee;
+        this.imageData = imageData;
+        this.imageName = imageName;
+    }
+
+    public String getId() {
+        return id;
+    }
+    public String getTitle() {
+        return title;
+    }
+    public String getDescription() {
+        return description;
+    }
+    public String getStatus() {
+        return status;
+    }
+    public String getType() {
+        return type;
+    }
+    public String getPriority() {
+        return priority;
+    }
+    public String getAssignee() {
+        return assignee!= null ? assignee : "-";
+    }
+
+    public byte[] getImageData() {
+        return imageData;
+    }
+
+    public String getImageName() {
+        return imageName;
+    }
+
+    public void setId(String id) {
+        this.id = id;
+    }
+    
+    public void setDescription(String description) {
+        this.description = description;
+    }
+    public void setTitle(String title) {
+        this.title = title;
+    }
+
+    public void setStatus(String status) {
+        this.status = status;
+    }
+    public void setType(String type) {
+        this.type = type;
+    }
+    public void setPriority(String priority) {
+        this.priority = priority;
+    }
+    public void setAssignee(String assignee) {
+        this.assignee = assignee;
+    }
+
+    public void setImageData(byte[] imageData) {
+        this.imageData = imageData;
+    }
+    public void setImageName(String imageName) {
+        this.imageName = imageName;
+    }
+    @Override
+    public String toString() {
+        return title;
+    }
+
+}
