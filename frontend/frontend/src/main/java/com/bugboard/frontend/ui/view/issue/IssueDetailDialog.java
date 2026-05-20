@@ -23,7 +23,7 @@ public class IssueDetailDialog extends JDialog {
     public IssueDetailDialog(Frame owner, Issue issue) {
         super(owner, "Dettaglio Segnalazione: " + issue.getTitle(), true);
         this.issue = issue;
-        this.apiService = new ApiService();
+        this.apiService = ApiService.getInstance();
 
         setSize(600, 500);
         setLocationRelativeTo(owner);

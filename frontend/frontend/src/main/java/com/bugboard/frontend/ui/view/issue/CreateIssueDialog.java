@@ -165,16 +165,21 @@ public class CreateIssueDialog extends JDialog{
             CreateIssueRequest request = new CreateIssueRequest(
                 titleField.getText(),
                 descriptionArea.getText(),
-                (String) typeCombo.getSelectedItem(),
-                (String) priorityCombo.getSelectedItem()
+                ((String) typeCombo.getSelectedItem()).trim(),
+                ((String) priorityCombo.getSelectedItem()).trim(),
                 selectImageBytes,
                 selectedImageName
             );
 
-            issueService.CreateIssue(request);
+            boolean success = issueService.createIssue(request);
+
+            if(success){
             isSaved = true;
             JOptionPane.showMessageDialog(this, "Segnalazione creata correttamente");
             dispose();
+            }else {
+              JOptionPane.showMessageDialog(this, "Errore: utente non autorizzato o sessione scaduta.", "Error", JOptionPane.ERROR_MESSAGE);
+            }
 
         } catch (Exception e) {
             e.printStackTrace();
