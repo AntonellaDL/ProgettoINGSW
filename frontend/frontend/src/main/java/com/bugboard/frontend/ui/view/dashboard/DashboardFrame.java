@@ -1,8 +1,11 @@
 package com.bugboard.frontend.ui.view.dashboard;
 import com.bugboard.frontend.model.Issue;
 import com.bugboard.frontend.services.ApiService;
+import com.bugboard.frontend.ui.view.auth.CreateUserDialog;
 import com.bugboard.frontend.ui.view.issue.CreateIssueDialog;
 import com.bugboard.frontend.ui.view.issue.IssueDetailDialog;
+import com.bugboard.frontend.model.User;
+import com.bugboard.frontend.utils.SessionManager;
 
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
@@ -45,9 +48,30 @@ public class DashboardFrame extends JFrame {
         
         JButton btnRefresh = new JButton("Aggiorna Lista");
 
+        // Bottone Crea Utente visibile solo agli Admin
+        JButton btnCreateUser = new JButton("+ Crea Utente");
+        btnCreateUser.setBackground(new Color(46, 204, 113)); 
+        btnCreateUser.setForeground(Color.WHITE);
+        btnCreateUser.setFocusPainted(false);
+
+        //bottone per il logout
+        JButton btnLogout = new JButton("Logout");
+        btnLogout.setBackground(new Color(231, 76, 60)); 
+        btnLogout.setForeground(Color.WHITE);
+        btnLogout.setFocusPainted(false);
+
         topPanel.add(btnNewIssue);
         topPanel.add(Box.createHorizontalStrut(10)); // Spazio tra i bottoni
         topPanel.add(btnRefresh);
+        topPanel.add(Box.createHorizontalStrut(10));
+        topPanel.add(btnLogout);
+
+        //controllo di sicurezza, per mostrare il bottone se l'utente è admin
+        User currentUser = SessionManager.getInstance().getCurrentUser();
+        if (currentUser != null && "ADMIN".equals(currentUser.getRole())) {
+            topPanel.add(Box.createHorizontalStrut(10)); // Spazio
+            topPanel.add(btnCreateUser);
+        }
         
         add(topPanel, BorderLayout.NORTH);
 
@@ -97,6 +121,32 @@ public class DashboardFrame extends JFrame {
                 }
             }
         });
+
+        // Azione Bottone Crea Utente
+        btnCreateUser.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                openCreateUserDialog();
+            }
+        });
+
+        
+        //Azione per il bottone di logout
+        btnLogout.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                // Svuota la sessione finta
+                SessionManager.getInstance().logout();
+                
+                // Chiude la Dashboard
+                dispose(); 
+                
+                // Riapre la schermata di Login
+                SwingUtilities.invokeLater(() -> {
+                    new com.bugboard.frontend.ui.view.auth.LoginFrame().setVisible(true);
+                });
+            }
+        });
     }
 
     // Metodo per caricare i dati dal Service
@@ -144,6 +194,17 @@ public class DashboardFrame extends JFrame {
                     return;
                 }
             }
+        }
+    }
+
+    // Apre la finestra per creare un nuovo utente visibile solo all'admin
+    private void openCreateUserDialog() {
+        CreateUserDialog dialog = new CreateUserDialog(this);
+        dialog.setVisible(true); // Rimane bloccato qui finché il dialog non viene chiuso
+        
+        if (dialog.isSaved()) {
+            System.out.println("[Dashboard] Un nuovo utente è stato registrato dall'amministratore.");
+            // Qui in futuro potremo ricaricare una tabella utenti se necessario
         }
     }
 }

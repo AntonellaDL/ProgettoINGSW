@@ -86,7 +86,7 @@ public class LoginFrame extends JFrame {
     }
 
     private void performLogin() {
-        String email = emailField.getText();
+        String email = emailField.getText().trim();
         String password = new String(passwordField.getPassword());
 
         if (email.isEmpty() || password.isEmpty()) {
@@ -94,7 +94,15 @@ public class LoginFrame extends JFrame {
             return;
         }
 
+        // controllo mail
+        if (!com.bugboard.frontend.utils.EmailValidator.isValid(email)) {
+            JOptionPane.showMessageDialog(this, "Inserisci un indirizzo email valido (es. nome@dominio.com).", "Formato non valido", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+
+        // tutti i controlli passati, prova a fare il login
         boolean success = authService.login(email, password);
+        
         if (success) {
             this.dispose();
 
