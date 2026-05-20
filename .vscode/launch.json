@@ -6,6 +6,13 @@
     "configurations": [
         {
             "type": "java",
+            "name": "Main",
+            "request": "launch",
+            "mainClass": "com.bugboard.frontend.Main",
+            "projectName": "frontend"
+        },
+        {
+            "type": "java",
             "name": "LoginFrame",
             "request": "launch",
             "mainClass": "com.bugboard.frontend.ui.LoginFrame",

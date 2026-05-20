@@ -25,7 +25,10 @@ public class IssueService {
         this.mapper = new ObjectMapper();
         this.mapper.registerModule(new JavaTimeModule());
     }
-    
 
+    public boolean createIssue(CreateIssueRequest request) {
+        // Per ora reindirizzo la chiamata all'ApiService
+        return apiService.createIssue(request);
+    }
 
 }

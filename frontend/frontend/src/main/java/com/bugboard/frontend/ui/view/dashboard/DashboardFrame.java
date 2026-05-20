@@ -1,6 +1,8 @@
 package com.bugboard.frontend.ui.view.dashboard;
 import com.bugboard.frontend.model.Issue;
 import com.bugboard.frontend.services.ApiService;
+import com.bugboard.frontend.ui.view.issue.CreateIssueDialog;
+import com.bugboard.frontend.ui.view.issue.IssueDetailDialog;
 
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
@@ -18,7 +20,7 @@ public class DashboardFrame extends JFrame {
     private ApiService apiService;
 
     public DashboardFrame() {
-        this.apiService = new ApiService();
+        this.apiService = ApiService.getInstance();
 
         setTitle("BugBoard26 - Dashboard");
         setSize(900, 600);
