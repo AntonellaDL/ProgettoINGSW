@@ -66,7 +66,7 @@ public class CreateIssueDialog extends JDialog{
 
         gbc.gridx = 1; gbc.gridy = 1;
         gbc.fill = GridBagConstraints.HORIZONTAL;
-        String[] types = {" BUG","FEATURE","DOCUMENTATION","QUESTION"};
+        String[] types = {"BUG","FEATURE","DOCUMENTATION","QUESTION"};
         typeCombo = new JComboBox<>(types);
         panel.add(typeCombo, gbc);
 
@@ -77,7 +77,7 @@ public class CreateIssueDialog extends JDialog{
 
         gbc.gridx=1; gbc.gridy=2;
         gbc.fill = GridBagConstraints.HORIZONTAL;
-        String[] priorities = {" ALTA", "MEDIA", "BASSA"};
+        String[] priorities = {"ALTA", "MEDIA", "BASSA"};
         priorityCombo = new JComboBox<>(priorities);
         panel.add(priorityCombo, gbc);
 
