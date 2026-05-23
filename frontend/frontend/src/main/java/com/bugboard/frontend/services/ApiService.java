@@ -29,9 +29,9 @@ public class ApiService {
 
     static {
         // Popolamento Issue
-        issues.add(new Issue("1","Login lento","Il login ci mette troppo", "todo", "bug", "alta", null, null, null));
-        issues.add(new Issue("2", "Errore 500", "Errore server quando si salva", "in progress", "bug", "media", null, null, null));
-        issues.add(new Issue("3", "Migliorare UI", "Rendere l'interfaccia user-friendly", "done", "enhancement", "bassa", null, null, null));
+        issues.add(new Issue("1","Login lento","Il login ci mette troppo", "todo", "BUG", "ALTA", null, null, null));
+        issues.add(new Issue("2", "Errore 500", "Errore server quando si salva", "in_progress", "BUG", "MEDIA", null, null, null));
+        issues.add(new Issue("3", "Migliorare UI", "Rendere l'interfaccia user-friendly", "done", "FEATURE", "BASSA", null, null, null));
 
         // Popolamento Amministratore di default
         User defaultAdmin = new User();
@@ -125,7 +125,7 @@ public class ApiService {
             newIssue.setPriority(request.getPriority());
             
             newIssue.setId(String.valueOf(issues.size() + 1));
-            newIssue.setStatus("TODO");
+            newIssue.setStatus("todo");
             
             issues.add(newIssue);
             System.out.println("[MOCK SERVER] Creata issue '" + request.getTitle() + "'");
