@@ -8,6 +8,7 @@ public class Issue {
     private String type;
     private String priority;
     private String assignee;
+    private java.util.List<Comment> comments = new java.util.ArrayList<>();
 
     private byte[] imageData;
     private String imageName;
@@ -44,7 +45,7 @@ public class Issue {
         return priority;
     }
     public String getAssignee() {
-        return assignee!= null ? assignee : "-";
+        return assignee;
     }
 
     public byte[] getImageData() {
@@ -88,6 +89,18 @@ public class Issue {
     @Override
     public String toString() {
         return title;
+    }
+
+    public java.util.List<Comment> getComments() {
+        return comments;
+    }
+
+    public void addComment(Comment comment) {
+        this.comments.add(comment);
+    }
+
+    public void setComments(java.util.List<Comment> comments) {
+        this.comments = comments;
     }
 
 }
