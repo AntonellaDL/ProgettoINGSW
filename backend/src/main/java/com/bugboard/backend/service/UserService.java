@@ -1,18 +1,22 @@
 package com.bugboard.backend.service;
-import com.bugboard.backend.model.Entity.User;
-import com.bugboard.backend.repository.UserRepository;
-import com.bugboard.backend.model.Enum.Role;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
-import jakarta.annotation.PostConstruct;
-
-import java.util.Optional;
 import java.util.List;
+import java.util.Optional;
+
+import org.springframework.stereotype.Service;
+
+import com.bugboard.backend.model.Entity.User;
+import com.bugboard.backend.model.Enum.Role;
+import com.bugboard.backend.repository.UserRepository;
+
+import jakarta.annotation.PostConstruct;
 
 @Service
 public class UserService {
-    @Autowired
-    private UserRepository userRepository;
+    private final UserRepository userRepository;
+
+    public UserService(UserRepository userRepository){
+        this.userRepository = userRepository;
+    }
     //creazione utente usato dall'admin
     public User createUser (User user) {
         return userRepository.save(user);

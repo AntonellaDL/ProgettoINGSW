@@ -11,7 +11,9 @@ public class IssueRequest {
 
     //ho aggiunto questo campo per far sapere al Backend chi sta creando la issue.
     //il frontend ci manderà l'id dell'utente loggato.
-    private long creatorId;
+    //uso Long (oggetto) e non long (primitivo) per evitare una NullPointerException
+    //in fase di unboxing se il JSON in arrivo non contiene il campo o lo manda null.
+    private Long creatorId;
 
     //aggiungere la parte delle immagini e/o allegati
 

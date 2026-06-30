@@ -1,11 +1,13 @@
 package com.bugboard.backend.repository;
 
 import java.util.List;
+
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.stereotype.Repository;
+
 import com.bugboard.backend.model.Entity.History;
 
-@Repository
+// non inserisco @Repository in quanto quando si utilizza Spring Data JPA 
+// qualsiasi interfaccia che estende JpaRepository viene riconosciuta automaticamente
 public interface HistoryRepository extends JpaRepository<History, Long> {
 
   // Metodo per trovare tutta la cronologia di una specifica Issue

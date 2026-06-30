@@ -3,11 +3,11 @@ package com.bugboard.backend.repository;
 import java.util.List;
 
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.stereotype.Repository;
 
 import com.bugboard.backend.model.Entity.Comment;
 
-@Repository
+// non inserisco @Repository in quanto quando si utilizza Spring Data JPA 
+// qualsiasi interfaccia che estende JpaRepository viene riconosciuta automaticamente 
 public interface CommentRepository extends JpaRepository<Comment, Long> {
 
     // Questo metodo è per il requisito 5.

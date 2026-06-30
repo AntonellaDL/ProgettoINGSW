@@ -2,7 +2,6 @@ package com.bugboard.backend.repository;
 import java.util.List;
 
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.stereotype.Repository;
 
 import com.bugboard.backend.model.Entity.Issue;
 import com.bugboard.backend.model.Enum.IssueStatus;
@@ -11,7 +10,8 @@ import com.bugboard.backend.model.Enum.Priority;
 
 //la repository serve per fare le query al database
 
-@Repository
+// non inserisco @Repository in quanto quando si utilizza Spring Data JPA 
+// qualsiasi interfaccia che estende JpaRepository viene riconosciuta automaticamente
 //quando scriviamo extends JpaRepository<Issue, Long> stiamo dicendo che questa repository
 //  gestisce l'entità Issue e che la chiave primaria di Issue è di tipo Long
 
@@ -19,7 +19,7 @@ public interface IssueRepository extends JpaRepository<Issue, Long> {
 
     //ttrova issue per id
     Issue findById(long id);
- @Override
+@Override
     //trova tutte le issue
     List<Issue> findAll();
 

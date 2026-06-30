@@ -1,20 +1,38 @@
 package com.bugboard.frontend.ui.view.dashboard;
 
+import java.awt.BorderLayout;
+import java.awt.Color;
+import java.awt.Dimension;
+import java.awt.FlowLayout;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
+import java.util.List;
+
+import javax.swing.BorderFactory;
+import javax.swing.Box;
+import javax.swing.BoxLayout;
+import javax.swing.JButton;
+import javax.swing.JComboBox;
+import javax.swing.JFrame;
+import javax.swing.JLabel;
+import javax.swing.JOptionPane;
+import javax.swing.JPanel;
+import javax.swing.JScrollPane;
+import javax.swing.JTable;
+import javax.swing.JTextField;
+import javax.swing.ListSelectionModel;
+import javax.swing.RowFilter;
+import javax.swing.SwingUtilities;
+import javax.swing.table.DefaultTableModel;
+import javax.swing.table.TableRowSorter;
+
 import com.bugboard.frontend.model.Issue;
+import com.bugboard.frontend.model.User;
 import com.bugboard.frontend.services.ApiService;
 import com.bugboard.frontend.ui.view.auth.CreateUserDialog;
 import com.bugboard.frontend.ui.view.issue.CreateIssueDialog;
 import com.bugboard.frontend.ui.view.issue.IssueDetailDialog;
-import com.bugboard.frontend.model.User;
 import com.bugboard.frontend.utils.SessionManager;
-
-import javax.swing.*;
-import javax.swing.table.DefaultTableModel;
-import javax.swing.table.TableRowSorter;
-import java.awt.*;
-import java.awt.event.MouseAdapter;
-import java.awt.event.MouseEvent;
-import java.util.List;
 
 public class DashboardFrame extends JFrame {
 
@@ -244,7 +262,7 @@ public class DashboardFrame extends JFrame {
                     IssueDetailDialog detail = new IssueDetailDialog(this, i);
                     detail.setVisible(true);
                     
-                    if (detail.isDataChanged()) {
+                    if (detail.isDateChanged()) {
                         loadData(); 
                     }
                     return;

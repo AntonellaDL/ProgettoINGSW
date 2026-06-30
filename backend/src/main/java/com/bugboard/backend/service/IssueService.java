@@ -2,6 +2,7 @@ package com.bugboard.backend.service;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -12,8 +13,10 @@ import com.bugboard.backend.model.Enum.IssueStatus;
 import com.bugboard.backend.model.Enum.IssueType;
 import com.bugboard.backend.model.Enum.Priority;
 import com.bugboard.backend.model.dto.IssueRequest;
+import com.bugboard.backend.model.dto.IssueResponse;
 import com.bugboard.backend.repository.IssueRepository;
 import com.bugboard.backend.repository.UserRepository;
+
 
 @Service
 public class IssueService {
@@ -36,15 +39,31 @@ public class IssueService {
 
   // metodi di base
 
-  public List<Issue> getAllIssues() {
-    return issueRepository.findAll();
+  public List<IssueResponse> getAllIssues() {
+    return issueRepository.findAll().stream().map(IssueResponse::new).collect(Collectors.toList());
   }
 
-  public Issue createIssue(IssueRequest request, MultipartFile attachmentFile) {
+  public IssueResponse createIssue(IssueRequest request, MultipartFile attachmentFile) {
     // 1. Trova creatore
+    if (request.getCreatorId() == null) {
+      throw new RuntimeException("Errore, creatorId obbligatorio");
+    }
     User creator = userRepository.findById(request.getCreatorId())
-        .orElseThrow(() -> new RuntimeException("Errore, Utente non trovato con ID " + request.getCreatorId()));
+    .orElseThrow(() -> new RuntimeException("Errore, Utente non trovato con ID " + request.getCreatorId()));
 
+        //valido i campi obbligatori
+        if(request.getTitle() == null || request.getTitle().isBlank()) {
+            throw new RuntimeException("Errore, il titolo è obbligatorio");
+        }
+
+        if(request.getDescription() == null || request.getDescription().isBlank()) {
+            throw new RuntimeException("Errore, la descrizione è obbligatoria");
+        }
+
+        if(request.getIssueType() == null) {
+            throw new RuntimeException("Errore, il tipo di issue è obbligatorio");
+        }
+//costruisco la nuova issue
     Issue nuovaIssue = new Issue();
     nuovaIssue.setTitle(request.getTitle());
     nuovaIssue.setDescription(request.getDescription());
@@ -66,10 +85,11 @@ public class IssueService {
     // 4. Salva nella History
     historyService.logCreationEvent(savedIssue, creator);
 
-    return savedIssue;
+    return new IssueResponse(savedIssue);
   }
 
-  public Issue assignIssue(Long issueId, Long assigneeId, User currentUser) {
+  // assegnazione 
+  public IssueResponse assignIssue(Long issueId, Long assigneeId, User currentUser) {
     Issue issue = issueRepository.findById(issueId)
         .orElseThrow(() -> new RuntimeException("Errore, Issue non trovata con ID " + issueId));
 
@@ -90,20 +110,56 @@ public class IssueService {
           "Ti è stato assegnato il bug: " + savedIssue.getTitle(),
           newAssignee);
     }
-    return savedIssue;
+    return new IssueResponse(savedIssue);
+  }
+  /*
+  * Aggiornamento stato 
+  * permette all'assegnatario di una segnalazione di modificare lo stato 
+  * se il nuovo stato è DONE invia automaticamente una notifica al creatore 
+  * issue ID è l'id della issue da aggiornare 
+  * newStatus  nuovo stato richiesto 
+  * ewquester id è l'id dell'utente che richiede l'aggiornamento 
+  * RunTimeException se la issue o l'utente non esistono 
+  * SecurityException se il richiedente non è l'assegnatario
+  */
+  public IssueResponse updateStatus(Long issueId, IssueStatus newStatus,Long requesterId){
+    Issue issue = issueRepository.findById(issueId)
+      .orElseThrow(()-> new RuntimeException("Issue non trovata con id "+issueId));
+    //solo l'assegnatario può modificare lo stato
+    if(issue.getAssignee()==null || !issue.getAssignee().getId().equals(requesterId)){
+      throw new SecurityException("Solo l'utente assegnato può modificare lo stato della segnalazione.");
+    }
+    
+    User requester = userRepository.findById(requesterId)
+    . orElseThrow(()-> new RuntimeException("Utente non trovato con id "+ requesterId));
+
+    IssueStatus oldStatus= issue.getStatus();
+    issue.setStatus(newStatus);
+    Issue saved= issueRepository.save(issue);
+
+    //registra l'evento nello storico 
+    historyService.logUpdateEvent(saved,requester,"lo stato",oldStatus.name(),newStatus.name());
+
+    //quando la issue è risolta, notifica al creatore
+    if(newStatus== IssueStatus.DONE && saved.getCreator()!=null){
+      String message =String.format("La tua segnalazione \"%s\" è stata risolta da %s.", saved.getTitle(),requester.getName());
+      notificationService.sendNotification(message,saved.getCreator());
+    }
+
+    return new IssueResponse(saved);
   }
 
   // SEZIONE FILTRI
 
-  public List<Issue> getIssuesByStatus(IssueStatus status) {
-    return issueRepository.findByStatus(status);
+  public List<IssueResponse> getIssuesByStatus(IssueStatus status) {
+    return issueRepository.findByStatus(status).stream().map(IssueResponse::new).collect(Collectors.toList());
   }
 
-  public List<Issue> getIssuesByType(IssueType type) {
-    return issueRepository.findByType(type);
+  public List<IssueResponse> getIssuesByType(IssueType type) {
+    return issueRepository.findByType(type).stream().map(IssueResponse::new).collect(Collectors.toList());
   }
 
-  public List<Issue> getIssuesByPriority(Priority priority) {
-    return issueRepository.findByPriority(priority);
+  public List<IssueResponse> getIssuesByPriority(Priority priority) {
+    return issueRepository.findByPriority(priority).stream().map(IssueResponse::new).collect(Collectors.toList());
   }
 }
