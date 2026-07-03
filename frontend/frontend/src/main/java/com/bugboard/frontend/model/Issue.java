@@ -1,4 +1,5 @@
 package com.bugboard.frontend.model;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 public class Issue {
     private String id;
@@ -7,6 +8,7 @@ public class Issue {
     private String status;
     private String type;
     private String priority;
+    @JsonProperty("assigneeUsername")
     private String assignee;
 
     //id dell'assegnatario

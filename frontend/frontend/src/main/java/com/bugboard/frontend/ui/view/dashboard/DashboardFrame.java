@@ -8,25 +8,12 @@ import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.util.List;
 
-import javax.swing.BorderFactory;
-import javax.swing.Box;
-import javax.swing.BoxLayout;
-import javax.swing.JButton;
-import javax.swing.JComboBox;
-import javax.swing.JFrame;
-import javax.swing.JLabel;
-import javax.swing.JOptionPane;
-import javax.swing.JPanel;
-import javax.swing.JScrollPane;
-import javax.swing.JTable;
-import javax.swing.JTextField;
-import javax.swing.ListSelectionModel;
-import javax.swing.RowFilter;
-import javax.swing.SwingUtilities;
+import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 import javax.swing.table.TableRowSorter;
 
 import com.bugboard.frontend.model.Issue;
+import com.bugboard.frontend.model.Notification;
 import com.bugboard.frontend.model.User;
 import com.bugboard.frontend.services.ApiService;
 import com.bugboard.frontend.ui.view.auth.CreateUserDialog;
@@ -39,6 +26,7 @@ public class DashboardFrame extends JFrame {
     private JTable issueTable;
     private DefaultTableModel tableModel;
     private ApiService apiService;
+    private JButton btnNotifiche;
     
     // Variabili per il filtraggio e ordinamento
     private TableRowSorter<DefaultTableModel> sorter;
@@ -56,6 +44,7 @@ public class DashboardFrame extends JFrame {
 
         initComponents();
         loadData(); 
+        aggiornaBadgeNotifiche();
 
     }
 
@@ -87,6 +76,9 @@ public class DashboardFrame extends JFrame {
         btnLogout.setForeground(Color.WHITE);
         btnLogout.setFocusPainted(false);
 
+        btnNotifiche = new JButton("Notifiche");
+        topPanel.add(btnNotifiche);
+
         topPanel.add(btnNewIssue);
         topPanel.add(Box.createHorizontalStrut(10));
         topPanel.add(btnRefresh);
@@ -114,7 +106,7 @@ public class DashboardFrame extends JFrame {
         // Tendina Stato
         filterPanel.add(Box.createHorizontalStrut(15));
         filterPanel.add(new JLabel("Stato ="));
-        statusFilterCombo = new JComboBox<>(new String[]{"Tutti", "todo", "in_progress", "done"});
+        statusFilterCombo = new JComboBox<>(new String[]{"Tutti", "todo", "in_progress", "done", "closed"});
         filterPanel.add(statusFilterCombo);
 
         // Tendina Priorità
@@ -159,6 +151,7 @@ public class DashboardFrame extends JFrame {
 
         btnRefresh.addActionListener(e -> {
             loadData();
+            aggiornaBadgeNotifiche();
             JOptionPane.showMessageDialog(DashboardFrame.this, "Lista aggiornata!");
         });
 
@@ -185,6 +178,7 @@ public class DashboardFrame extends JFrame {
         typeFilterCombo.addActionListener(e -> applyFilters());
         statusFilterCombo.addActionListener(e -> applyFilters());
         priorityFilterCombo.addActionListener(e -> applyFilters());
+        btnNotifiche.addActionListener(e -> apriDialogoNotifiche());
         
         searchFilterField.getDocument().addDocumentListener(new javax.swing.event.DocumentListener() {
             public void insertUpdate(javax.swing.event.DocumentEvent e) { applyFilters(); }
@@ -278,4 +272,56 @@ public class DashboardFrame extends JFrame {
             System.out.println("[Dashboard] Un nuovo utente è stato registrato dall'amministratore.");
         }
     }
+
+public void aggiornaBadgeNotifiche() {
+    User u = SessionManager.getInstance().getCurrentUser();
+    if (u == null) return; 
+
+    // thread separato per evitare blocchi dell'interfaccia utente
+    new Thread(() -> {
+        List<Notification> notifiche = apiService.getUserNotifications(u.getId());
+        
+        if (notifiche != null) {
+            long nonLette = notifiche.stream().filter(n -> !n.isRead()).count();
+            
+            // aggiorno la grafica nel thread dell'interfaccia utente
+            SwingUtilities.invokeLater(() -> {
+                btnNotifiche.setText("Notifiche (" + nonLette + ")");
+            });
+        }
+    }).start();
+}
+
+     private void apriDialogoNotifiche() {
+        User u = SessionManager.getInstance().getCurrentUser();
+        List<Notification> notifiche = apiService.getUserNotifications(u.getId());
+
+        JDialog dialog = new JDialog(this, "Le tue Notifiche", true);
+        dialog.setLayout(new BorderLayout());
+        
+        DefaultListModel<String> listModel = new DefaultListModel<>();
+        for (Notification n : notifiche) {
+            listModel.addElement((n.isRead() ? "[Letta] " : "[NUOVA] ") + n.getMessage());
+        }
+        
+        JList<String> list = new JList<>(listModel);
+        list.addMouseListener(new MouseAdapter() {
+            public void mouseClicked(MouseEvent e) {
+                if (e.getClickCount() == 2) {
+                    int idx = list.getSelectedIndex();
+                    if (idx != -1 && !notifiche.get(idx).isRead()) {
+                        apiService.markNotificationAsRead(notifiche.get(idx).getId());
+                        aggiornaBadgeNotifiche();
+                        dialog.dispose();
+                    }
+                }
+            }
+        });
+
+        dialog.add(new JScrollPane(list), BorderLayout.CENTER);
+        dialog.setSize(400, 300);
+        dialog.setLocationRelativeTo(this);
+        dialog.setVisible(true);
+    }
+
 }

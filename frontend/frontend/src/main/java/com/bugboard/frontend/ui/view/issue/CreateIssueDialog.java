@@ -59,11 +59,10 @@ public class CreateIssueDialog extends JDialog{
         gbc.insets = new Insets (8,8,8,8);
         gbc.anchor = GridBagConstraints.WEST;
 
-        //titolo
         gbc.gridx = 0;
         gbc.gridy = 0;
         gbc.fill= GridBagConstraints.NONE;
-        panel.add(new JLabel(), gbc);
+        panel.add(new JLabel("Titolo * :"), gbc);
 
         gbc.gridx = 1;
         gbc.gridy = 0;
@@ -86,7 +85,6 @@ public class CreateIssueDialog extends JDialog{
         typeCombo = new JComboBox<>(types);
         panel.add(typeCombo, gbc);
 
-        //Priorità opzionale
         gbc.gridx = 0;
         gbc.gridy = 2;
         gbc.fill = GridBagConstraints.NONE;
@@ -95,8 +93,7 @@ public class CreateIssueDialog extends JDialog{
         gbc.gridx = 1;
         gbc.gridy = 2;
         gbc.fill = GridBagConstraints.HORIZONTAL;
-        //il primo elemento vuoto consente di non specificare la priorità
-        String [] priorities = {"", "BASSA", "MEDIA", "ALTA"};
+        String [] priorities = {"BASSA", "MEDIA", "ALTA"};
         priorityCombo = new JComboBox<>(priorities);
         panel.add(priorityCombo, gbc);
 
@@ -198,10 +195,7 @@ public class CreateIssueDialog extends JDialog{
         }
 
         try{
-            /*la priorità è l'elemento selezionato, se è la stringa vuota
-                viene passata come null e il backend la gestisce come opzionale 
-            */
-
+            // La priorità ha un valore di default a "BASSA"
             String priority = ((String) priorityCombo.getSelectedItem()).trim();
 
             CreateIssueRequest request = new CreateIssueRequest(
@@ -230,5 +224,4 @@ public class CreateIssueDialog extends JDialog{
     public boolean isSaved(){
         return isSaved;
     }
-
 }

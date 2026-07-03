@@ -7,6 +7,8 @@ import java.awt.FlowLayout;
 import java.awt.Font;
 import java.awt.Frame;
 import java.awt.Image;
+import java.util.ArrayList;
+import java.util.List;
 
 import javax.swing.BorderFactory;
 import javax.swing.Box;
@@ -42,6 +44,7 @@ public class IssueDetailDialog extends JDialog{
     private JTextArea newCommentArea;
     private JScrollPane commentsScroll;
     private boolean dataChanged = false;
+    private List<User> listaUtentiBackend = new ArrayList<>();
 
     public IssueDetailDialog(Frame owner, Issue issue){
         super (owner, "Dettaglio segnalazione: "+issue.getTitle(),true);
@@ -54,7 +57,12 @@ public class IssueDetailDialog extends JDialog{
         setLocationRelativeTo(owner);
 
         initComponents();
-       refreshComments();
+        //scarico i commenti dal server e li mostro
+        List<Comment> commentiDalServer = apiService.getCommentsByIssue(issue.getId());
+        if (commentiDalServer != null) {
+            issue.setComments(commentiDalServer); 
+        }
+        refreshComments();
     }
 
     //costruzione UI
@@ -76,7 +84,9 @@ public class IssueDetailDialog extends JDialog{
             + "| Priorità: "+issue.getPriority());
         
         info.setForeground(Color.DARK_GRAY);
-        metaPanel.add(Box.createHorizontalStrut(30));
+        metaPanel.add(info);
+        metaPanel.add(Box.createHorizontalStrut(15));
+        
 
         //tendina stato 
         metaPanel.add(new JLabel("Stato: "));
@@ -99,10 +109,34 @@ public class IssueDetailDialog extends JDialog{
         metaPanel.add(Box.createHorizontalStrut(15));
 
         //tendina assegnatario 
-        metaPanel.add(new JLabel("Assegnato a: "));
-        String [] utenti = {"Non assegnato","Mario Rossi","Luigi Verdi"};
-        assigneeCombo = new JComboBox<>(utenti);
-        assigneeCombo.setSelectedItem(issue.getAssignee()!=null ? issue. getAssignee(): "Non assegnato");
+         metaPanel.add(new JLabel("Assegnato a: "));
+        assigneeCombo = new JComboBox<>();
+        assigneeCombo.addItem("Non assegnato");
+
+        // Carica gli utenti dal server per popolare la tendina assegnatario
+        listaUtentiBackend = apiService.getAllUsers();
+        for (User u : listaUtentiBackend) {
+            assigneeCombo.addItem(u.getEmail());
+        }
+
+        if (issue.getAssigeeId() != null) {
+            // Se la issue ha un ID assegnatario, cerca l'email corrispondente
+            for (User u : listaUtentiBackend) {
+                if (u.getId().equals(issue.getAssigeeId())) {
+                    assigneeCombo.setSelectedItem(u.getEmail());
+                    break;
+                }
+            }
+        } else {
+            assigneeCombo.setSelectedItem("Non assegnato");
+        }
+
+        //helper nel sessionManager controllo sull'admin
+        boolean isAdmin = SessionManager.getInstance().isAdmin();
+        assigneeCombo.setEnabled(isAdmin);
+        if (!isAdmin) {
+            assigneeCombo.setToolTipText("Solo un Amministratore può assegnare o riassegnare i bug.");
+        }
         metaPanel.add(assigneeCombo);
 
         headerPanel.add(metaPanel, BorderLayout.CENTER);
@@ -172,16 +206,35 @@ public class IssueDetailDialog extends JDialog{
         JButton btnClose = new JButton("Chiudi");
         
 
-        // mostra salva modifiche solo all'assegnatario: 
-        btnSave.setVisible(isAssignee);
-                btnSave.addActionListener(e -> saveStatusChange());
-                btnClose.addActionListener(e -> dispose());
+        // mostra salva modifiche solo all'assegnatario o all'admin: 
+        btnSave.setVisible(isAssignee || isAdmin);
+
+       bloccaUISeStatoDone(btnSave);
+        
+        btnSave.addActionListener(e -> saveStatusChange());
+        btnClose.addActionListener(e -> dispose());
          
                 btnPanel.add(btnAddComment);
                 btnPanel.add(btnSave);
                 btnPanel.add(btnClose);
                 footerPanel.add(btnPanel, BorderLayout.SOUTH);
                 add(footerPanel, BorderLayout.SOUTH);
+    }
+
+    /**
+     * Congela i componenti dell'interfaccia se la segnalazione è già stata risolta
+     */
+    private void bloccaUISeStatoDone(JButton btnSave) {
+        String currentStatus = issue.getStatus() != null ? issue.getStatus().toUpperCase() : "TODO";
+        
+        if ("DONE".equals(currentStatus) || "CLOSED".equals(currentStatus)) {
+            statusCombo.setEnabled(false);
+            assigneeCombo.setEnabled(false);
+            // Forza la scomparsa del bottone salva
+            if (btnSave != null) {
+                btnSave.setVisible(false);
+            }
+        }
     }
 
     private boolean isCurrentUserAssignee(){
@@ -194,7 +247,7 @@ public class IssueDetailDialog extends JDialog{
         }
     }
     
-    private void saveStatusChange(){
+   private void saveStatusChange(){
         User currentUser = SessionManager.getInstance().getCurrentUser();
         //controllo sessione 
         if(currentUser==null){
@@ -203,12 +256,21 @@ public class IssueDetailDialog extends JDialog{
         }
 
         //controllo autorizzazione 
-        if (!isCurrentUserAssignee()){
-            JOptionPane.showMessageDialog(this,"Solo l'utente assegnato alla segnalazione può modificarne lo stato.", "Operazione non consentita.", JOptionPane.WARNING_MESSAGE);
+        if (!isCurrentUserAssignee() && !SessionManager.getInstance().isAdmin()){
+            JOptionPane.showMessageDialog(this,"Non hai i permessi per modificare questa segnalazione.", "Operazione non consentita", JOptionPane.WARNING_MESSAGE);
             return;
         }
 
         String newStatus =(String) statusCombo.getSelectedItem();
+        String currentAssigneeName = (String) assigneeCombo.getSelectedItem();
+
+        // Non si può risolvere un bug se non c'è un assegnatario
+        if ("DONE".equals(newStatus) && "Non assegnato".equals(currentAssigneeName)) {
+            JOptionPane.showMessageDialog(this, 
+                "Impossibile risolvere un bug senza un assegnatario.\nAssegna prima la segnalazione a qualcuno.", 
+                "Azione non valida", JOptionPane.WARNING_MESSAGE);
+            return; 
+        }
 
         // conferma esplicita se si imposta Done 
         if("DONE".equals(newStatus)){
@@ -218,28 +280,77 @@ public class IssueDetailDialog extends JDialog{
                 return;
             }
         }
-        //chiamata HTTP al backend 
-        boolean success = apiService.updateIssueStatus(issue.getId(), newStatus,currentUser.getId());
 
-        if (success){
-            issue.setStatus(newStatus);
-            dataChanged = true;
+        // logica di salvataggio
+        
+        boolean successStatus = true;
+        boolean successAssign = true;
+        boolean haEffettuatoModifiche = false;
 
-            String messaggio ="Stato aggiornato a \""+newStatus+"\" con successo";
-
-            if("DONE".equals(newStatus)){
-                messaggio+= "\n Il creatore della segnalazione è stato notificato.";
-            }
-
-            JOptionPane.showMessageDialog(this, messaggio, "Aggiornamento completato", JOptionPane.INFORMATION_MESSAGE);
-            dispose();
-        }
-        else{
-            JOptionPane.showMessageDialog(this,
-                "Impossibile aggiornare lo stato.\n"
-                + "Verifica di essere l'assegnatario oppure che il server sia raggiungibile.",
-                "Errore", JOptionPane.ERROR_MESSAGE);
+        // gestione assegnazione issue
+        if (SessionManager.getInstance().isAdmin()) {
+            Long assigneeId = null;
             
+            if ("Non assegnato".equals(currentAssigneeName)) {
+                // Se l'admin prova a rimuovere un assegnatario esistente
+                if (issue.getAssigeeId() != null) {
+                    JOptionPane.showMessageDialog(this, 
+                        "Questo sistema non supporta la rimozione dell'assegnatario.\nSeleziona un altro utente per riassegnare la segnalazione.", 
+                        "Operazione non supportata", JOptionPane.WARNING_MESSAGE);
+                    return; // Interrompe il salvataggio
+                }
+            } else {
+                // Ricerca normale dell'ID
+                for (User u : listaUtentiBackend) {
+                    if (u.getEmail().equals(currentAssigneeName)) {
+                        assigneeId = u.getId();
+                        break;
+                    }
+                }
+            }
+            
+            // Se l'ID è stato trovato ed è diverso da quello attuale, invia al server
+            if (assigneeId != null && !assigneeId.equals(issue.getAssigeeId())) {
+                successAssign = apiService.assignIssue(issue.getId(), assigneeId, currentUser.getId());
+                if (successAssign) {
+                    issue.setAssignee(currentAssigneeName);
+                    issue.setAssigneeId(assigneeId); // aggiornamento id locale
+                    haEffettuatoModifiche = true;
+                }
+            }
+        }
+
+        // gestione dello stato, la fa solo l'assegnatario
+        // Se lo stato è cambiato e l'utente corrente è l'effettivo assegnatario, aggiorna lo stato
+        String oldStatus = issue.getStatus() != null ? issue.getStatus().toUpperCase() : "TODO";
+        if (!oldStatus.equals(newStatus) && isCurrentUserAssignee()) {
+            successStatus = apiService.updateIssueStatus(issue.getId(), newStatus, currentUser.getId());
+            if (successStatus) {
+                issue.setStatus(newStatus);
+                haEffettuatoModifiche = true;
+            }
+        }
+
+        // messaggio di conferma o errore
+        if (successStatus && successAssign) {
+            if (haEffettuatoModifiche) {
+                dataChanged = true;
+
+                if (getOwner() instanceof com.bugboard.frontend.ui.view.dashboard.DashboardFrame) {
+                    ((com.bugboard.frontend.ui.view.dashboard.DashboardFrame) getOwner()).aggiornaBadgeNotifiche();
+                }
+                String messaggio = "Modifiche salvate con successo!";
+                if ("DONE".equals(newStatus) && isCurrentUserAssignee() && !oldStatus.equals(newStatus)) {
+                    messaggio += "\nIl creatore della segnalazione è stato notificato.";
+                }
+                JOptionPane.showMessageDialog(this, messaggio, "Aggiornamento completato", JOptionPane.INFORMATION_MESSAGE);
+            }
+            dispose();
+        } else {
+            JOptionPane.showMessageDialog(this,
+                "Impossibile salvare i dati sul server.\n"
+                + "Verifica i tuoi permessi o che il server sia raggiungibile.",
+                "Errore", JOptionPane.ERROR_MESSAGE);
         }
     }
 
@@ -255,8 +366,6 @@ public class IssueDetailDialog extends JDialog{
         }
         String autore = u.getEmail();
 
-        // Invio reale al backend: prima i commenti venivano solo aggiunti
-        // in memoria (issue.addComment) e non venivano mai salvati.
         boolean success = apiService.postComment(Long.valueOf(issue.getId()), u.getId(), testo);
         if(!success){
             JOptionPane.showMessageDialog(this,"Impossibile salvare il commento sul server.","Errore", JOptionPane.ERROR_MESSAGE);

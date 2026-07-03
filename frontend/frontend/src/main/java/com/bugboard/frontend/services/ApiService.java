@@ -18,97 +18,147 @@ import com.bugboard.frontend.model.User;
 import com.bugboard.frontend.model.dto.CreateIssueRequest;
 import com.bugboard.frontend.utils.SessionManager;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.bugboard.frontend.model.Comment;
+import com.bugboard.frontend.model.Notification;
 
 public class ApiService {
 
-    //singleton pattern per garantire un'unica istanza del servizio API
+    // singleton pattern per garantire un'unica istanza del servizio API
     private static ApiService instance;
 
-    private ApiService(){}
+    // costanti per le chiamate API
+    private static final String BASE_URL = "http://localhost:8080/api";
+    
+    // Istanze uniche e globali 
+    private final HttpClient client;
+    private final ObjectMapper mapper;
+
+    private ApiService(){
+        // Vengono creati una sola volta all'avvio
+        this.client = HttpClient.newHttpClient();
+        this.mapper = new ObjectMapper();
+
+        this.mapper.registerModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule());
+        this.mapper.configure(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+    }
 
     public static synchronized ApiService getInstance(){
         if(instance == null) instance = new ApiService();
         return instance;
     }
 
-    //costanti per le chiamate API
-    private static final String BASE_URL = "http://localhost:8080/api";
-    // dati mock usati solo per login e la registrazione 
-    private static final List<User>  users = new ArrayList<>();
-    private static final Map<String, String> mockPasswordVault = new HashMap<>();
-    private static final List<Issue> issues = new ArrayList<>();
-
-    static {
-        // Popolamento Issue
-        issues.add(new Issue("1","Login lento","Il login ci mette troppo", "todo", "BUG", "ALTA", null, null, null));
-        issues.add(new Issue("2", "Errore 500", "Errore server quando si salva", "in_progress", "BUG", "MEDIA", null, null, null));
-        issues.add(new Issue("3", "Migliorare UI", "Rendere l'interfaccia user-friendly", "done", "FEATURE", "BASSA", null, null, null));
-
-        // Popolamento Amministratore di default
-        User defaultAdmin = new User();
-        defaultAdmin.setId(1L);
-        defaultAdmin.setEmail("admin@bugboard.com"); 
-        defaultAdmin.setName("Amministratore di Default");
-        defaultAdmin.setRole("ADMIN");
-        
-        users.add(defaultAdmin);
-        // Salvo la password nella cassaforte simulata
-        mockPasswordVault.put("admin@bugboard.com", "password"); 
-    }
-
     // METODI DI AUTENTICAZIONE E GESTIONE UTENTI 
-    public boolean LoginFrame(String email, String password){
-        for(User u : users) {
-            if (u.getEmail().equals(email)) {
+    public boolean loginFrame(String email, String password){ 
+        try {
+            Map<String, String> credentials = new HashMap<>();
+            credentials.put("username", email); 
+            credentials.put("password", password);
+            
+            // Usiamo il mapper globale
+            String jsonData = mapper.writeValueAsString(credentials);
+
+            // Usiamo il client globale
+            HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(BASE_URL + "/auth/login")) 
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(jsonData, StandardCharsets.UTF_8))
+                .build();
+
+            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+
+            if (response.statusCode() == 200) {
+                User loggedUser = mapper.readValue(response.body(), User.class);
                 
-                // Recupero la password dalla mappa privata usando l'email
-                String correctPassword = mockPasswordVault.get(email);
+                SessionManager.getInstance().setAuthToken("token-" + loggedUser.getId()); 
+                SessionManager.getInstance().setCurrentUser(loggedUser);
                 
-                if (correctPassword != null && correctPassword.equals(password)) {
-                    SessionManager.getInstance().setAuthToken("mock-token-" + u.getEmail());
-                    SessionManager.getInstance().setCurrentUser(u);
-                    System.out.println("[MOCK SERVER] Login riuscito per utente: " + u.getEmail() + " | Ruolo: " + u.getRole());
-                    return true;
-                }
+                System.out.println("[API] Login effettuato dal server per: " + loggedUser.getEmail());
+                return true;
+            } else if (response.statusCode() == 401) {
+                System.err.println("[API] Credenziali errate. Rifiutato dal server.");
+                return false;
+            } else {
+                System.err.println("[API] Errore imprevisto. Status: " + response.statusCode());
+                return false;
             }
+        } catch (Exception e) {
+            System.err.println("[API] Errore di connessione per il login: " + e.getMessage());
+            e.printStackTrace();
+            return false;
         }
-        System.out.println("[MOCK SERVER] Tentativo di login fallito per: " + email);
-        return false;
     }
 
     public boolean registerNewUser(String email, String password, String role) {
-        // Controllo se l'utente è loggato
         if (!SessionManager.getInstance().isLoggedIn()) {
-            System.err.println("[MOCK SERVER] Errore: Utente non loggato tenta di creare una utenza.");
+            System.err.println("[API] Errore: Utente non loggato tenta di creare una utenza.");
             return false;
         }
 
-        // Controllo se l'utente ha il ruolo di ADMIN
         User currentUser = SessionManager.getInstance().getCurrentUser();
-        if (!"ADMIN".equals(currentUser.getRole())) {
-            System.err.println("[MOCK SERVER] Accesso Negato: L'utente " + currentUser.getEmail() + " non è ADMIN e non può creare utenze.");
+        if (!"ADMIN".equalsIgnoreCase(currentUser.getRole())) {
+            System.err.println("[API] Accesso Negato: Solo l'ADMIN può creare utenze.");
             return false;
         }
 
-        // Controllo se l'email è già registrata
-        for (User u : users) {
-            if (u.getEmail().equalsIgnoreCase(email)) {
-                System.err.println("[MOCK SERVER] Errore: L'email " + email + " è già registrata.");
+        try {
+            Map<String, String> newUserPayload = new HashMap<>();
+            newUserPayload.put("email", email);
+            newUserPayload.put("password", password);
+            
+            String backendRole = "USER"; 
+            if (role != null && (role.toUpperCase().contains("ADMIN") || role.toUpperCase().contains("AMMINISTRATORE"))) {
+                backendRole = "ADMIN";
+            }
+            newUserPayload.put("role", backendRole);
+            newUserPayload.put("name", email.contains("@") ? email.split("@")[0] : email);
+
+            String jsonData = mapper.writeValueAsString(newUserPayload);
+            
+            HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(BASE_URL + "/users")) 
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(jsonData, StandardCharsets.UTF_8))
+                .build();
+
+            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+
+            if (response.statusCode() == 200 || response.statusCode() == 201) {
+                System.out.println("[API] Utente creato con successo sul server! Email: " + email + " | Ruolo: " + role);
+                return true;
+            } else {
+                System.err.println("[API] Errore dal server durante la registrazione. HTTP " + response.statusCode());
+                System.err.println("Dettaglio errore: " + response.body());
                 return false;
             }
-        }
 
-        // Creazione nuovo utente
-        User newUser = new User();
-        newUser.setId((long) (users.size() + 1));
-        newUser.setEmail(email);
-        newUser.setName(email.contains("@") ? email.split("@")[0] : email); 
-        newUser.setRole(role.toUpperCase()); 
-        users.add(newUser);
-        // Salvataggio della password nella cassaforte simulata
-        mockPasswordVault.put(email, password);
-        System.out.println("[MOCK SERVER] Utente creato con successo! Email: " + email + " | Ruolo: " + role);
-        return true;
+        } catch (Exception e) {
+            System.err.println("[API] Errore di connessione durante la registrazione: " + e.getMessage());
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    public List<User> getAllUsers() {
+        if (!SessionManager.getInstance().isLoggedIn()) {
+            return new ArrayList<>();
+        }
+        try {
+            HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(BASE_URL + "/users"))
+                .GET()
+                .build();
+                
+            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+            
+            if (response.statusCode() == 200) {
+                return mapper.readValue(response.body(), new com.fasterxml.jackson.core.type.TypeReference<List<User>>(){});
+            } else {
+                System.err.println("[API] Errore caricamento utenti. Status: " + response.statusCode());
+            }
+        } catch (Exception e) {
+            System.err.println("[API] Impossibile connettersi per caricare gli utenti: " + e.getMessage());
+        }
+        return new ArrayList<>();
     }
 
     // METODI GESTIONE ISSUE 
@@ -117,12 +167,27 @@ public class ApiService {
             System.err.println("Errore: Utente non loggato sta provando a leggere le issues");
             return new ArrayList<>();
         }
-        return new ArrayList<>(issues);
+        
+        try {
+            HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(BASE_URL + "/issues"))
+                .GET()
+                .build();
+                
+            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+            
+            if (response.statusCode() == 200) {
+                return mapper.readValue(response.body(), new com.fasterxml.jackson.core.type.TypeReference<List<Issue>>(){});
+            } else {
+                System.err.println("[API] Errore nel caricamento delle issue. Status: " + response.statusCode());
+            }
+        } catch (Exception e) {
+            System.err.println("[API] Impossibile contattare il backend per le issue: " + e.getMessage());
+        }
+        
+        return new ArrayList<>(); 
     }
 
-    /*
-    * Creazione issue con chiamata HTTP reale al backend
-    */
     public boolean createIssue(CreateIssueRequest request) {
         if (!SessionManager.getInstance().isLoggedIn()) {
             System.err.println("Errore: utente non autenticato");
@@ -130,38 +195,28 @@ public class ApiService {
         }
         try{
             User currentUser = SessionManager.getInstance().getCurrentUser();
-           // costruisce il JSON della parte data
-            ObjectMapper mapper = new ObjectMapper();
             Map<String,Object> jsonMap = new LinkedHashMap<>();
             jsonMap.put("title", request.getTitle());
             jsonMap.put("description", request.getDescription()); 
             jsonMap.put("issueType", request.getType());
 
-            //priorità è opzionale, quindi la aggiungiamo solo se non è null
             if(request.getPriority() != null && !request.getPriority().isBlank()){
                 jsonMap.put("priority", request.getPriority());
             }
 
             jsonMap.put("creatorID",currentUser.getId());
-            String jsonData = mapper. writeValueAsString(jsonMap);
+            String jsonData = mapper.writeValueAsString(jsonMap);
 
-            //genera un boundary unico per il multipart
             String boundary ="Bug Board Boundary"+ UUID.randomUUID().toString().replace("-", "");
             String CRLF = "\r\n";
 
-            //costruisce il corpo 
-
             ByteArrayOutputStream baos = new ByteArrayOutputStream();
-
-            //parte data
 
             baos.write(("--" + boundary + CRLF).getBytes(StandardCharsets.UTF_8));
             baos.write(("Content-Disposition: form-data; name=\"data\"" + CRLF).getBytes(StandardCharsets.UTF_8));
             baos.write(("Content-Type: application/json" + CRLF + CRLF).getBytes(StandardCharsets.UTF_8));
             baos.write(jsonData.getBytes(StandardCharsets.UTF_8));
             baos.write(CRLF.getBytes(StandardCharsets.UTF_8));
-
-            //parte attachmentFile (immagine, opzionale )
 
             if(request.getImageData() != null && request.getImageData().length >0){
                 String fileName = (request.getImageName()!= null && !request.getImageName().isBlank())
@@ -172,11 +227,8 @@ public class ApiService {
                 baos.write(CRLF.getBytes(StandardCharsets.UTF_8));
             }
 
-            //chiude il corpo
             baos.write(("--"+ boundary + "--" + CRLF).getBytes(StandardCharsets.UTF_8));
             
-            // invia richiesta http
-            HttpClient client = HttpClient.newHttpClient();
             HttpRequest httpRequest = HttpRequest.newBuilder()
                 .uri (URI.create(BASE_URL + "/issues"))
                 .header("Content-Type", "multipart/form-data; boundary="+ boundary)
@@ -185,7 +237,7 @@ public class ApiService {
 
             HttpResponse<String> response = client.send(httpRequest, HttpResponse.BodyHandlers.ofString());
 
-            System.out.println("[aPI] create issue -> HTTP "+ response.statusCode());
+            System.out.println("[API] create issue -> HTTP "+ response.statusCode());
             if(response.statusCode()!= 200){
                 System.err.println("[API] Risposta backend: "+ response.body());
             }
@@ -199,23 +251,15 @@ public class ApiService {
     }
 
     // METODI GESTIONE COMMENTI
-
-    /*
-    * Invia un nuovo commento al backend tramite POST /api/comments
-    * In precedenza i commenti venivano aggiunti solo in memoria lato
-    * frontend e non venivano mai persistiti sul server: questo metodo
-    * colma quella mancanza.
-    */
     public boolean postComment(Long issueId, Long authorId, String text){
         try{
-            ObjectMapper mapper = new ObjectMapper();
             Map<String,Object> jsonMap = new LinkedHashMap<>();
             jsonMap.put("issueId", issueId);
             jsonMap.put("authorId", authorId);
             jsonMap.put("text", text);
+            
             String jsonData = mapper.writeValueAsString(jsonMap);
 
-            HttpClient client = HttpClient.newHttpClient();
             HttpRequest httpRequest = HttpRequest.newBuilder()
                 .uri(URI.create(BASE_URL + "/comments"))
                 .header("Content-Type", "application/json")
@@ -235,21 +279,36 @@ public class ApiService {
         }
     }
 
-    //aggiornamento stato 
-    /*
-    * * Chiama PUT /api/issues/{issueId}/status?status={newStatus}&userId={userId}
-    ** il backend verifica che @code userId sia l'assegnatario 
-    */
+    public List<Comment> getCommentsByIssue(String issueId) {
+        try {
+            HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(BASE_URL + "/comments/issue/" + issueId))
+                .GET()
+                .build();
+
+            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+
+            if (response.statusCode() == 200) {
+                return mapper.readValue(response.body(), new com.fasterxml.jackson.core.type.TypeReference<List<Comment>>(){});
+            } else {
+                System.err.println("[API] Impossibile recuperare i commenti. Status: " + response.statusCode());
+            }
+        } catch (Exception e) {
+            System.err.println("[API] Errore di rete in getCommentsByIssue: " + e.getMessage());
+            e.printStackTrace();
+        }
+        return new ArrayList<>(); 
+    }
+
     public boolean updateIssueStatus(String issueId, String newStatus,Long userId){
         try{
             String url = BASE_URL + "/issues/"+ issueId+"/status?status="+newStatus+"&userId="+userId;
-            HttpClient client= HttpClient.newHttpClient();
             HttpRequest request = HttpRequest.newBuilder()
             .uri(URI.create(url))
             .PUT(HttpRequest.BodyPublishers.noBody())
             .build();
 
-            HttpResponse<String> response =client.send(request, HttpResponse.BodyHandlers.ofString());
+            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
             System.out.println("[API] update Issue status "+ response.statusCode());
             if(response.statusCode()==403){
                 System.out.println("[API] Accesso negato: non sei l'assegnatario.");
@@ -260,9 +319,87 @@ public class ApiService {
                 return response.statusCode() == 200;
             
         } catch (Exception e) {
-                    System.err.println("[API] Errore updateIssueStatus: " + e.getMessage());
-                    e.printStackTrace();
-                    return false;
+            System.err.println("[API] Errore updateIssueStatus: " + e.getMessage());
+            e.printStackTrace();
+            return false;
         }
-    }        
+    }  
+    
+    public boolean assignIssue(String issueId, Long assigneeId, Long currentUserId) {
+        try {
+            String url = BASE_URL + "/issues/" + issueId + "/assign?assigneeId=" + assigneeId + "&userId=" + currentUserId;
+            HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(url))
+                .PUT(HttpRequest.BodyPublishers.noBody()) 
+                .build();
+
+            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+            System.out.println("[API] assign Issue -> HTTP " + response.statusCode());
+            
+            if (response.statusCode() != 200) {
+                System.err.println("[API] Errore assegnazione backend: " + response.body());
+            }
+            
+            return response.statusCode() == 200;
+            
+        } catch (Exception e) {
+            System.err.println("[API] Errore di connessione durante assignIssue: " + e.getMessage());
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    // METODI GESTIONE NOTIFICHE
+    
+    /**
+     * Recupera tutte le notifiche di un utente.
+     */
+    public List<Notification> getUserNotifications(Long userId) {
+        if (!SessionManager.getInstance().isLoggedIn()) {
+            return new ArrayList<>();
+        }
+        try {
+            HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(BASE_URL + "/notifications/user/" + userId))
+                .GET()
+                .build();
+
+            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+
+            if (response.statusCode() == 200) {
+                return mapper.readValue(response.body(), new com.fasterxml.jackson.core.type.TypeReference<List<Notification>>(){});
+            } else {
+                System.err.println("[API] Impossibile caricare le notifiche. Status: " + response.statusCode());
+            }
+        } catch (Exception e) {
+            System.err.println("[API] Errore di connessione per getUserNotifications: " + e.getMessage());
+            e.printStackTrace();
+        }
+        return new ArrayList<>();
+    }
+
+    /**
+     * Segna una specifica notifica come letta.
+     */
+    public boolean markNotificationAsRead(Long notificationId) {
+        try {
+            HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(BASE_URL + "/notifications/" + notificationId + "/read"))
+                .PUT(HttpRequest.BodyPublishers.noBody())
+                .build();
+
+            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+            
+            if (response.statusCode() == 200) {
+                System.out.println("[API] Notifica " + notificationId + " segnata come letta.");
+                return true;
+            } else {
+                System.err.println("[API] Errore segnando notifica come letta. Status: " + response.statusCode());
+            }
+        } catch (Exception e) {
+            System.err.println("[API] Errore di rete in markNotificationAsRead: " + e.getMessage());
+            e.printStackTrace();
+        }
+        return false;
+    }
 }

@@ -2,6 +2,7 @@ package com.bugboard.backend.service;
 import java.util.List;
 import java.util.Optional;
 
+import org.mindrot.jbcrypt.BCrypt;
 import org.springframework.stereotype.Service;
 
 import com.bugboard.backend.model.Entity.User;
@@ -19,6 +20,14 @@ public class UserService {
     }
     //creazione utente usato dall'admin
     public User createUser (User user) {
+        // la password in chiaro inviata dal frontend
+    String passwordInChiaro = user.getPassword();
+    
+    //  Genera l'hash usando BCrypt
+    String hashedPassword = BCrypt.hashpw(passwordInChiaro, BCrypt.gensalt());
+    
+    //a password nell'oggetto sostituita con l'hash e salva nel database
+         user.setPassword(hashedPassword);
         return userRepository.save(user);
     }
 
@@ -27,12 +36,14 @@ public class UserService {
         return userRepository.findAll();
     }
 
-    //Login utente
+//Login utente
     public User login(String email, String password) {
         Optional<User> userOpt = userRepository.findByEmail(email);
         if (userOpt.isPresent()) {
             User user = userOpt.get();
-            if (user.getPassword().equals(password)) {
+            
+            //  usa BCrypt.checkpw per confrontare le pw
+            if (BCrypt.checkpw(password, user.getPassword())) {
                 return user; // Login riuscito
             }
         }
@@ -40,13 +51,15 @@ public class UserService {
     }
 
     //admin di default
-    @PostConstruct
+@PostConstruct
     public void initAdminUser() {
         //controllo se il database è vuoto
         if (userRepository.count() == 0) {
-            // //se non esiste creo un admin di default
+            // se non esiste creo un admin di default 
             User admin = new User( "admin@bugboard.com","admin123", "Admin", Role.ADMIN);
-            userRepository.save(admin);
+            
+            createUser(admin); 
+            
             System.out.println("Admin di default creato: " + admin.getEmail());
         }
     }

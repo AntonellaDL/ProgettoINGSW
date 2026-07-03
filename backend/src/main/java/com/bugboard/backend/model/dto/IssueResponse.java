@@ -51,11 +51,11 @@ public class IssueResponse {
 
         if(issue.getCreator() != null) {
             this.creatorId = issue.getCreator().getId();
-            this.creatorUsername = issue.getCreator().getName();
+            this.creatorUsername = issue.getCreator().getEmail();
         }
         if(issue.getAssignee() != null) {
             this.assigneeId = issue.getAssignee().getId();
-            this.assigneeUsername = issue.getAssignee().getName();
+            this.assigneeUsername = issue.getAssignee().getEmail();
         }
     }
 

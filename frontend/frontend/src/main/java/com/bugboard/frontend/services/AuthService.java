@@ -4,7 +4,7 @@ public class AuthService {
     
     public boolean login(String email, String password) {
         // Simulazione di una chiamata API per il login
-        boolean success = ApiService.getInstance().LoginFrame(email, password);
+        boolean success = ApiService.getInstance().loginFrame(email, password);
         
         if (success) {
             System.out.println("[AuthService] Login effettuato con successo via ApiService per: " + email);

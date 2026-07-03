@@ -6,6 +6,13 @@
     "configurations": [
         {
             "type": "java",
+            "name": "BackendApplication",
+            "request": "launch",
+            "mainClass": "com.bugboard.backend.BackendApplication",
+            "projectName": "backend"
+        },
+        {
+            "type": "java",
             "name": "Main",
             "request": "launch",
             "mainClass": "com.bugboard.frontend.Main",
