@@ -44,7 +44,7 @@ public class IssueService {
   }
 
   public IssueResponse createIssue(IssueRequest request, MultipartFile attachmentFile) {
-    // 1. Trova creatore
+    //  Trova creatore
     if (request.getCreatorId() == null) {
       throw new RuntimeException("Errore, creatorId obbligatorio");
     }
@@ -73,16 +73,16 @@ public class IssueService {
     nuovaIssue.setStatus(IssueStatus.TODO);
     nuovaIssue.setCreatedAt(LocalDateTime.now());
 
-    // 2. Gestione allegato
+    //  Gestione allegato
     if (attachmentFile != null && !attachmentFile.isEmpty()) {
       String fileName = fileStorageService.saveFile(attachmentFile);
       nuovaIssue.setAttachmentUrl("/uploads/" + fileName);
     }
 
-    // 3. Salva Issue (era dentro parentesi sbagliate)
+    //  Salva Issue 
     Issue savedIssue = issueRepository.save(nuovaIssue);
 
-    // 4. Salva nella History
+    //  Salva nella History
     historyService.logCreationEvent(savedIssue, creator);
 
     return new IssueResponse(savedIssue);
