@@ -124,10 +124,16 @@ public class CreateIssueDialog extends JDialog{
         gbc.fill = GridBagConstraints.HORIZONTAL;
         JPanel filePanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
         JButton uploadButton = new JButton("Allega immagine");
+        JLabel formatHintLabel = new JLabel("(Solo formati JPG o PNG)");
+        formatHintLabel.setForeground(Color.GRAY);
+        formatHintLabel.setFont(formatHintLabel.getFont().deriveFont(Font.ITALIC, 11f));
+
         imageLabel = new JLabel ("Nessun file selezionato");
         imageLabel.setForeground(Color.GRAY);
+
         uploadButton.addActionListener(e-> chooseImage());
         filePanel.add(uploadButton);
+        filePanel.add(formatHintLabel); 
         filePanel.add(imageLabel);
         panel.add(filePanel, gbc);
 

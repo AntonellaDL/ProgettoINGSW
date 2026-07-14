@@ -64,6 +64,10 @@ public class IssueServiceUnitTest {
         mockIssue.setStatus(IssueStatus.TODO);
     }
 
+    // =================================================================================
+    // TEST SUITE: assignIssue
+    // =================================================================================
+
     // --- TEST N-WECT (Classi Valide) ---
 
     @Test
